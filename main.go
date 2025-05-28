@@ -16,7 +16,7 @@ func usage() {
 	fmt.Fprintln(flag.CommandLine.Output(), `xlcsv - convert Excel to csv
 
 USAGE:
-  xlcsv [ARGS]
+  xlcsv [OPTIONS] [ARGS]
 
 ARGS:
   <file name>
