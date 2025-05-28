@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -18,27 +20,30 @@ USAGE:
 
 ARGS:
   <file name>
-        Excel file to read, if "-" or not provided stdin will be used
+        Excel file to read, if "-" or not provided stdin will be used.
 
 OPTIONS:`)
 	flag.PrintDefaults()
 }
 
 func main() {
-	output := flag.String("o", "", "Output file, if empty it will output to stdout")
+	output := flag.String("o", "", "Output file, if empty it will output to stdout.")
 
 	var opts options
-	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "Sheet name")
-	flag.StringVar(&opts.password, "pw", "", "Password")
+	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "Sheet name.")
+	flag.StringVar(&opts.password, "password", "", "File password, if any.")
+	flag.Var(&opts.columns, "pick", "Comma separated list of column indexes to include (zero based). Can be used to reorder columns.")
 
 	flag.Usage = usage
 	flag.Parse()
 
+	input := flag.Arg(0)
+
 	var in io.Reader
-	if flag.Arg(0) == "" || flag.Arg(0) == "-" {
+	if input == "" || input == "-" {
 		in = os.Stdin
 	} else {
-		f, err := os.Open(flag.Arg(0))
+		f, err := os.Open(input)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: opening file: %v\n", err)
 			os.Exit(1)
@@ -71,6 +76,7 @@ func main() {
 type options struct {
 	sheet    string
 	password string
+	columns  columns
 }
 
 func run(input io.Reader, out io.Writer, opts options) error {
@@ -88,11 +94,53 @@ func run(input io.Reader, out io.Writer, opts options) error {
 	}
 
 	w := csv.NewWriter(out)
-	w.WriteAll(rows)
+
+	if len(opts.columns) == 0 {
+		w.WriteAll(rows)
+	} else {
+		for _, row := range rows {
+			var rec []string
+			for _, col := range opts.columns {
+				if col < len(row) {
+					rec = append(rec, row[col])
+				}
+			}
+			w.Write(rec)
+		}
+	}
 
 	if err := w.Error(); err != nil {
 		return fmt.Errorf("writing csv: %v", err)
 	}
 
 	return nil
+}
+
+// columns is a custom cli flag that contains a comma separated list of ints.
+type columns []int
+
+var _ flag.Value = (*columns)(nil)
+
+func (c *columns) Set(v string) error {
+	for a := range strings.SplitSeq(v, ",") {
+		i, err := strconv.Atoi(a)
+		if err != nil {
+			return err
+		}
+
+		*c = append(*c, i)
+	}
+	return nil
+}
+
+func (c *columns) String() string {
+	var buf strings.Builder
+	for _, i := range *c {
+		if buf.Len() > 0 {
+			buf.WriteRune(',')
+		}
+
+		buf.WriteString(strconv.Itoa(i))
+	}
+	return buf.String()
 }
