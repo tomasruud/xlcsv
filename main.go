@@ -28,11 +28,12 @@ OPTIONS:`)
 
 func main() {
 	output := flag.String("o", "", "Output file, if empty it will output to stdout.")
+	listSheets := flag.Bool("ls", false, "List available sheets")
 
 	var opts options
-	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "Sheet name.")
-	flag.StringVar(&opts.password, "password", "", "File password, if any.")
-	flag.Var(&opts.columns, "pick", "Comma separated list of column indexes to include (zero based). Can be used to reorder columns.")
+	flag.StringVar(&opts.sheet, "s", "Sheet1", "Sheet name.")
+	flag.StringVar(&opts.password, "p", "", "File password, if any.")
+	flag.Var(&opts.columns, "c", "Comma separated list of column indexes to include (zero based). Can be used to reorder columns.")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -67,7 +68,14 @@ func main() {
 		out = f
 	}
 
-	if err := run(in, out, opts); err != nil {
+	var err error
+	if *listSheets {
+		err = dumpSheets(in, out, opts)
+	} else {
+		err = dumpData(in, out, opts)
+	}
+
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -79,7 +87,20 @@ type options struct {
 	columns  columns
 }
 
-func run(input io.Reader, out io.Writer, opts options) error {
+func dumpSheets(input io.Reader, out io.Writer, opts options) error {
+	file, err := excelize.OpenReader(input, excelize.Options{
+		Password: opts.password,
+	})
+	if err != nil {
+		return fmt.Errorf("opening spreadsheet (is it password protected?): %v", err)
+	}
+	defer file.Close()
+
+	_, err = out.Write([]byte(strings.Join(file.GetSheetList(), "\n")))
+	return err
+}
+
+func dumpData(input io.Reader, out io.Writer, opts options) error {
 	file, err := excelize.OpenReader(input, excelize.Options{
 		Password: opts.password,
 	})
