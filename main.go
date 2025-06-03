@@ -134,18 +134,20 @@ func dumpData(file *excelize.File, out io.Writer, sheet string, columns []int) e
 	w := csv.NewWriter(out)
 
 	if len(columns) == 0 {
-		w.WriteAll(rows)
-	} else {
-		for _, row := range rows {
-			var rec []string
-			for _, col := range columns {
-				if col < len(row) {
-					rec = append(rec, row[col])
-				}
-			}
-			w.Write(rec)
-		}
+		return w.WriteAll(rows)
 	}
+
+	for _, row := range rows {
+		var rec []string
+		for _, col := range columns {
+			if col < len(row) {
+				rec = append(rec, row[col])
+			}
+		}
+		w.Write(rec)
+	}
+
+	w.Flush()
 
 	if err := w.Error(); err != nil {
 		return fmt.Errorf("writing csv: %v", err)
@@ -160,14 +162,16 @@ type columns []int
 var _ flag.Value = (*columns)(nil)
 
 func (c *columns) Set(v string) error {
+	var is []int
 	for a := range strings.SplitSeq(v, ",") {
 		i, err := strconv.Atoi(a)
 		if err != nil {
 			return err
 		}
 
-		*c = append(*c, i)
+		is = append(is, i)
 	}
+	*c = is
 	return nil
 }
 
