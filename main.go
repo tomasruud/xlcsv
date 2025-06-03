@@ -41,21 +41,30 @@ OPTIONS:
 }
 
 func main() {
-	var output string
-	flag.StringVar(&output, "output", "", "Output")
-	flag.StringVar(&output, "o", "", "Output")
+	opts := struct {
+		listSheets bool
 
-	var listSheets bool
-	flag.BoolVar(&listSheets, "list-sheets", false, "List sheets")
-	flag.BoolVar(&listSheets, "ls", false, "List sheets")
+		password string
 
-	var opts options
-	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "Sheet name")
-	flag.StringVar(&opts.sheet, "s", "Sheet1", "Sheet name")
-	flag.StringVar(&opts.password, "password", "", "Password")
-	flag.StringVar(&opts.password, "p", "", "Password")
-	flag.Var(&opts.columns, "columns", "Columns")
-	flag.Var(&opts.columns, "c", "Columns")
+		sheet   string
+		columns columns
+		output  string
+	}{}
+
+	flag.StringVar(&opts.password, "p", "", "")
+	flag.StringVar(&opts.password, "password", "", "")
+
+	flag.BoolVar(&opts.listSheets, "ls", false, "")
+	flag.BoolVar(&opts.listSheets, "list-sheets", false, "")
+
+	flag.StringVar(&opts.sheet, "s", "Sheet1", "")
+	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "")
+
+	flag.Var(&opts.columns, "c", "")
+	flag.Var(&opts.columns, "columns", "")
+
+	flag.StringVar(&opts.output, "o", "", "")
+	flag.StringVar(&opts.output, "output", "", "")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -76,11 +85,20 @@ func main() {
 		in = f
 	}
 
+	file, err := excelize.OpenReader(in, excelize.Options{
+		Password: opts.password,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: opening spreadsheet (is it password protected?): %v\n", err)
+		os.Exit(1)
+	}
+	defer file.Close()
+
 	var out io.Writer
-	if output == "" {
+	if opts.output == "" {
 		out = os.Stdout
 	} else {
-		f, err := os.Create(output)
+		f, err := os.Create(opts.output)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: creating output file: %v\n", err)
 			os.Exit(1)
@@ -90,11 +108,10 @@ func main() {
 		out = f
 	}
 
-	var err error
-	if listSheets {
-		err = dumpSheets(in, os.Stdout, opts)
+	if opts.listSheets {
+		err = dumpSheets(file, os.Stdout)
 	} else {
-		err = dumpData(in, out, opts)
+		err = dumpData(file, out, opts.sheet, opts.columns)
 	}
 
 	if err != nil {
@@ -103,47 +120,25 @@ func main() {
 	}
 }
 
-type options struct {
-	sheet    string
-	password string
-	columns  columns
-}
-
-func dumpSheets(input io.Reader, out io.Writer, opts options) error {
-	file, err := excelize.OpenReader(input, excelize.Options{
-		Password: opts.password,
-	})
-	if err != nil {
-		return fmt.Errorf("opening spreadsheet (is it password protected?): %v", err)
-	}
-	defer file.Close()
-
-	_, err = out.Write([]byte(strings.Join(file.GetSheetList(), "\n") + "\n"))
+func dumpSheets(file *excelize.File, out io.Writer) error {
+	_, err := out.Write([]byte(strings.Join(file.GetSheetList(), "\n") + "\n"))
 	return err
 }
 
-func dumpData(input io.Reader, out io.Writer, opts options) error {
-	file, err := excelize.OpenReader(input, excelize.Options{
-		Password: opts.password,
-	})
-	if err != nil {
-		return fmt.Errorf("opening spreadsheet (is it password protected?): %v", err)
-	}
-	defer file.Close()
-
-	rows, err := file.GetRows(opts.sheet)
+func dumpData(file *excelize.File, out io.Writer, sheet string, columns []int) error {
+	rows, err := file.GetRows(sheet)
 	if err != nil {
 		return fmt.Errorf("reading rows: %v", err)
 	}
 
 	w := csv.NewWriter(out)
 
-	if len(opts.columns) == 0 {
+	if len(columns) == 0 {
 		w.WriteAll(rows)
 	} else {
 		for _, row := range rows {
 			var rec []string
-			for _, col := range opts.columns {
+			for _, col := range columns {
 				if col < len(row) {
 					rec = append(rec, row[col])
 				}
