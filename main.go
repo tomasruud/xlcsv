@@ -33,9 +33,9 @@ OPTIONS:
       Lists available sheets
 
   -s, --sheet <name>
-      Sheet name that should be converted
+      Sheet name that should be converted, defaults to "Sheet1"
   -c, --columns <x[,y]>
-      Column indexes to include, zero based, can be used to change column order
+      Column indexes to include, zero based, can be used to change column order, defaults to all columns
   -o, --output <name>
       Output file, if empty stdout will be used`)
 }
