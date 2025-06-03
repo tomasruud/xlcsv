@@ -13,7 +13,7 @@ import (
 )
 
 func usage() {
-	fmt.Fprintln(flag.CommandLine.Output(), `xlcsv - convert Excel to csv
+	fmt.Fprintln(os.Stderr, `xlcsv - convert Excel to csv
 
 USAGE:
   xlcsv [OPTIONS] [ARGS]
@@ -22,18 +22,40 @@ ARGS:
   <file name>
         Excel file to read, if "-" or not provided stdin will be used.
 
-OPTIONS:`)
-	flag.PrintDefaults()
+OPTIONS:
+  -h, --help
+      Prints help information
+
+  -p, --password <password>
+      Password, if the file is password protected
+
+  -ls, --list-sheets
+      Lists available sheets
+
+  -s, --sheet <name>
+      Sheet name that should be converted
+  -c, --columns <x[,y]>
+      Column indexes to include, zero based, can be used to change column order
+  -o, --output <name>
+      Output file, if empty stdout will be used`)
 }
 
 func main() {
-	output := flag.String("o", "", "Output file, if empty it will output to stdout.")
-	listSheets := flag.Bool("ls", false, "List available sheets")
+	var output string
+	flag.StringVar(&output, "output", "", "Output")
+	flag.StringVar(&output, "o", "", "Output")
+
+	var listSheets bool
+	flag.BoolVar(&listSheets, "list-sheets", false, "List sheets")
+	flag.BoolVar(&listSheets, "ls", false, "List sheets")
 
 	var opts options
-	flag.StringVar(&opts.sheet, "s", "Sheet1", "Sheet name.")
-	flag.StringVar(&opts.password, "p", "", "File password, if any.")
-	flag.Var(&opts.columns, "c", "Comma separated list of column indexes to include (zero based). Can be used to reorder columns.")
+	flag.StringVar(&opts.sheet, "sheet", "Sheet1", "Sheet name")
+	flag.StringVar(&opts.sheet, "s", "Sheet1", "Sheet name")
+	flag.StringVar(&opts.password, "password", "", "Password")
+	flag.StringVar(&opts.password, "p", "", "Password")
+	flag.Var(&opts.columns, "columns", "Columns")
+	flag.Var(&opts.columns, "c", "Columns")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -55,10 +77,10 @@ func main() {
 	}
 
 	var out io.Writer
-	if *output == "" {
+	if output == "" {
 		out = os.Stdout
 	} else {
-		f, err := os.Create(*output)
+		f, err := os.Create(output)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: creating output file: %v\n", err)
 			os.Exit(1)
@@ -69,8 +91,8 @@ func main() {
 	}
 
 	var err error
-	if *listSheets {
-		err = dumpSheets(in, out, opts)
+	if listSheets {
+		err = dumpSheets(in, os.Stdout, opts)
 	} else {
 		err = dumpData(in, out, opts)
 	}
@@ -96,7 +118,7 @@ func dumpSheets(input io.Reader, out io.Writer, opts options) error {
 	}
 	defer file.Close()
 
-	_, err = out.Write([]byte(strings.Join(file.GetSheetList(), "\n")))
+	_, err = out.Write([]byte(strings.Join(file.GetSheetList(), "\n") + "\n"))
 	return err
 }
 
