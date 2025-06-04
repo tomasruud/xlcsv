@@ -74,6 +74,7 @@ func main() {
 	reader := csv.NewReader(os.Stdin)
 	reader.Comma = rune(opts.delimiter[0])
 	reader.ReuseRecord = true
+	reader.Comment = '#'
 
 	writer := csv.NewWriter(os.Stdout)
 	writer.Comma = rune(opts.delimiter[0])
